@@ -9,7 +9,7 @@ import java.util.*;
 /**
  * Sorts the log and calculate indexes.
  * Since an index cannot be known until end of the log, we are building whole log into the memory first.
- * For a long log that would be inefficient and require external storage solution.
+ * For a bigdata scale log that would be inefficient and would require streaming to external storage.
  */
 public class SortContext {
 
@@ -37,24 +37,12 @@ public class SortContext {
      * @param line line to parse
      */
     public void addLine(String[] line) {
-        String[] customerAndPhone = line[1].split(CUST_PHONE_SPLIT_CHAR);
-
-        //create pojo from line values
-        LogEntry logEntry = new LogEntry();
-        logEntry.setItem(line[0].trim());
-        logEntry.setCustomer(customerAndPhone[0].trim());
-        logEntry.setPhoneNumber(customerAndPhone[1]);
-        //normalize whitespaces in date and parse
-        logEntry.setDateTime(
-                LocalDateTime.parse(
-                        line[2]
-                                .trim()
-                                .replaceAll("\\s+", " "), DATE_FORMAT));
+        LogEntry logEntry = lineToLogEntry(line);
 
         //add to original order list
         entries.add(logEntry);
 
-        //add to timestamp ordered queue per each customer
+        //add to timestamp ordered queue per customer
         PriorityQueue<LogEntry> customerLogEntries = logEntryPriorityQueue.computeIfAbsent(logEntry.getCustomer(), s -> new PriorityQueue<>((o1, o2) -> {
             if (o1.getDateTime() == null || o2.getDateTime() == null) {
                 throw new IllegalStateException();
@@ -66,7 +54,7 @@ public class SortContext {
 
     /**
      * Traverses a queue ordered by the timestamp and assigns order into the pojo for each customer.
-     * Returns a list in an original order as appeared in the log with order assigned.
+     * Returns a list in an original order as appeared in the log with an order assigned.
      *
      * @return A list of pojo
      */
@@ -80,5 +68,21 @@ public class SortContext {
             }
         });
         return this.entries;
+    }
+
+    private LogEntry lineToLogEntry(String[] line) {
+        String[] customerAndPhone = line[1].split(CUST_PHONE_SPLIT_CHAR);
+        //create pojo from line values
+        LogEntry logEntry = new LogEntry();
+        logEntry.setItem(line[0].trim());
+        logEntry.setCustomer(customerAndPhone[0].trim());
+        logEntry.setPhoneNumber(customerAndPhone[1]);
+        //normalize whitespaces in date and parse
+        logEntry.setDateTime(
+                LocalDateTime.parse(
+                        line[2]
+                                .trim()
+                                .replaceAll("\\s+", " "), DATE_FORMAT));
+        return logEntry;
     }
 }

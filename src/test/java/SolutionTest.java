@@ -1,5 +1,4 @@
 import net.grigoriadi.Solution;
-import net.grigoriadi.SortContext;
 import net.grigoriadi.pojo.LogEntry;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -10,13 +9,8 @@ public class SolutionTest {
 
     @Test
     public void testSolution() {
-        String filePath = System.getenv("filePath");
-        if (filePath == null) {
-            throw new IllegalStateException("Please specify a file path");
-        }
-        Solution solution = new Solution(filePath);
-        SortContext sort = solution.sort();
-        List<LogEntry> entriesWithOrder = sort.getEntriesWithOrder();
+        Solution solution = new Solution(Solution.DEFAULT);
+        List<LogEntry> entriesWithOrder = solution.getLogEntries();
 
         LogEntry current = entriesWithOrder.get(0);
         Assertions.assertEquals(2, current.getOrder());
