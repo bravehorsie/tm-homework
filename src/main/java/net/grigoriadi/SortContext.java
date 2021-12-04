@@ -16,10 +16,9 @@ public class SortContext {
     //Original order as appeared in the log
     private final List<LogEntry> entries;
 
-    //Order based on the timestamp of entries
-    private final PriorityQueue<LogEntry> logEntryPriorityQueue;
+    //Order based on the timestamp of entries split by customer name
+    private final Map<String, PriorityQueue<LogEntry>> logEntryPriorityQueue;
 
-    private static final String SPLIT_CHAR = ",";
     private static final String CUST_PHONE_SPLIT_CHAR = "/";
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -27,12 +26,7 @@ public class SortContext {
     public SortContext() {
         this.entries = new LinkedList<>();
         //Priority queue with a time based comparator
-        this.logEntryPriorityQueue = new PriorityQueue<>((o1, o2) -> {
-            if (o1.getDateTime() == null || o2.getDateTime() == null) {
-                throw new IllegalStateException();
-            }
-            return o1.getDateTime().compareTo(o2.getDateTime());
-        });
+        this.logEntryPriorityQueue = new HashMap<>();
     }
 
     /**
@@ -42,35 +36,49 @@ public class SortContext {
      *
      * @param line line to parse
      */
-    public void addLine(String line) {
-        //not considering escape characters
-        String[] lineEntries = line.split(SPLIT_CHAR);
-        String[] customerAndPhone = lineEntries[1].split(CUST_PHONE_SPLIT_CHAR);
+    public void addLine(String[] line) {
+        String[] customerAndPhone = line[1].split(CUST_PHONE_SPLIT_CHAR);
 
+        //create pojo from line values
         LogEntry logEntry = new LogEntry();
-        logEntry.setItem(lineEntries[0]);
-        logEntry.setCustomer(customerAndPhone[0]);
+        logEntry.setItem(line[0].trim());
+        logEntry.setCustomer(customerAndPhone[0].trim());
         logEntry.setPhoneNumber(customerAndPhone[1]);
-        //normalize whitespaces
+        //normalize whitespaces in date and parse
         logEntry.setDateTime(
                 LocalDateTime.parse(
-                        lineEntries[2]
+                        line[2]
                                 .trim()
                                 .replaceAll("\\s+", " "), DATE_FORMAT));
 
+        //add to original order list
         entries.add(logEntry);
-        logEntryPriorityQueue.add(logEntry);
+
+        //add to timestamp ordered queue per each customer
+        PriorityQueue<LogEntry> customerLogEntries = logEntryPriorityQueue.computeIfAbsent(logEntry.getCustomer(), s -> new PriorityQueue<>((o1, o2) -> {
+            if (o1.getDateTime() == null || o2.getDateTime() == null) {
+                throw new IllegalStateException();
+            }
+            return o1.getDateTime().compareTo(o2.getDateTime());
+        }));
+        customerLogEntries.add(logEntry);
     }
 
     /**
-     * Traverses a queue ordered by the timestamp and assigns order into the pojo.
-     * Returns a list in a original order as appeared in the log.
+     * Traverses a queue ordered by the timestamp and assigns order into the pojo for each customer.
+     * Returns a list in an original order as appeared in the log with order assigned.
      *
      * @return A list of pojo
      */
     public List<LogEntry> getEntriesWithOrder() {
-        int[] idx = {0};
-        logEntryPriorityQueue.forEach(logEntry -> logEntry.setOrder(idx[0]++));
+        //Iterate each of the customer queue ordered by date
+        logEntryPriorityQueue.values().forEach(logEntries -> {
+            int idx = 0;
+            LogEntry logEntry;
+            while ((logEntry = logEntries.poll()) != null) {
+                logEntry.setOrder(++idx);
+            }
+        });
         return this.entries;
     }
 }
